@@ -19,7 +19,39 @@
 
     <section class="layout">
       <aside class="panel controls">
-        <div class="panel-title">PLANET PARAMETERS</div>
+        <div class="panel-title">IMPORT FROM ELITE DANGEROUS</div>
+        <label>System name
+          <input id="edsmSystem" type="text" autocomplete="off" placeholder="e.g. Wolf 359"
+            title="The star system name, exactly as it appears in-game.">
+        </label>
+        <label>Body designation <span>optional</span>
+          <input id="edsmBody" type="text" autocomplete="off" placeholder="e.g. 2 a or B"
+            title="The planet's letter/number designation, as shown after the system name in-game. Leave blank to pick from a list.">
+        </label>
+        <button id="edsmFetch" class="secondary">FETCH FROM EDSM</button>
+        <div id="edsmStatus" class="message small">Optional — fetches real orbital data and colors the heatmap to match the planet type.</div>
+        <label id="edsmPickWrap" hidden>Matching bodies
+          <select id="edsmPick"></select>
+        </label>
+
+        <div class="panel-title sub">HEATMAP PALETTE</div>
+        <label>Planet type <span>manual fallback</span>
+          <select id="planetType" title="Sets the heatmap color palette. Overwritten automatically by a successful EDSM fetch.">
+            <option value="default">Default</option>
+            <option value="icy">Icy body</option>
+            <option value="rockyIce">Rocky ice body</option>
+            <option value="rocky">Rocky body</option>
+            <option value="highMetal">High metal content world</option>
+            <option value="metalRich">Metal-rich body</option>
+            <option value="earthlike">Earth-like world</option>
+            <option value="waterWorld">Water world</option>
+            <option value="waterGiant">Water giant</option>
+            <option value="ammonia">Ammonia world</option>
+            <option value="gasGiant">Gas giant</option>
+          </select>
+        </label>
+
+        <div class="panel-title sub">PLANET PARAMETERS</div>
 
         <label>Orbital period <span>days</span>
           <input id="orbitalPeriod" type="text" inputmode="decimal" autocomplete="off" value="16.9"
@@ -101,6 +133,7 @@
             <span><i class="twilight"></i> moderate</span>
             <span><i class="day"></i> high daylight</span>
           </div>
+          <div class="legend small muted" id="paletteCaption">Palette: Default</div>
         </div>
 
         <div class="panel">
