@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Planetary Daylight Optimizer — find the best latitude and longitude for daylight on any planet.">
+  <title>Planetary Daylight Optimizer</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">PLANETARY SURFACE ANALYSIS</div>
+        <h1>DAYLIGHT OPTIMIZER</h1>
+      </div>
+      <div class="status">CLIENT-SIDE // GITHUB PAGES READY</div>
+    </header>
+
+    <section class="layout">
+      <aside class="panel controls">
+        <div class="panel-title">PLANET PARAMETERS</div>
+
+        <label>Orbital period <span>days</span>
+          <input id="orbitalPeriod" type="number" step="0.001" min="0.001" value="16.9">
+        </label>
+        <label>Rotational period <span>days</span>
+          <input id="rotationPeriod" type="number" step="0.001" min="0.001" value="16.9">
+        </label>
+        <label>Axial tilt <span>degrees</span>
+          <input id="axialTilt" type="number" step="0.01" value="124.74">
+        </label>
+        <label>Orbital eccentricity <span>0–0.99</span>
+          <input id="eccentricity" type="number" step="0.0001" min="0" max="0.99" value="0.0002">
+        </label>
+        <label>Argument of periapsis <span>degrees</span>
+          <input id="argPeriapsis" type="number" step="0.01" value="191.20">
+        </label>
+
+        <div class="panel-title sub">OPTIMIZATION</div>
+        <label>Latitude resolution <span>degrees</span>
+          <select id="latStep">
+            <option value="2">2° — faster</option>
+            <option value="1" selected>1° — balanced</option>
+            <option value="0.5">0.5° — detailed</option>
+          </select>
+        </label>
+        <label>Longitude resolution <span>degrees</span>
+          <select id="lonStep">
+            <option value="2">2° — faster</option>
+            <option value="1" selected>1° — balanced</option>
+            <option value="0.5">0.5° — detailed</option>
+          </select>
+        </label>
+        <label>Orbit samples
+          <select id="samples">
+            <option value="720">720</option>
+            <option value="1440" selected>1,440</option>
+            <option value="2880">2,880</option>
+          </select>
+        </label>
+
+        <button id="calculate" class="primary">RUN FULL ORBIT ANALYSIS</button>
+        <button id="loadExample" class="secondary">LOAD EXAMPLE PLANET</button>
+      </aside>
+
+      <section class="content">
+        <div class="panel result">
+          <div class="panel-title">OPTIMAL FIXED LOCATION</div>
+          <div class="coords">
+            <div><small>LATITUDE</small><strong id="bestLat">—</strong></div>
+            <div><small>LONGITUDE</small><strong id="bestLon">—</strong></div>
+            <div><small>DAYLIGHT</small><strong id="daylightPct">—</strong></div>
+          </div>
+          <div class="metrics">
+            <div><span>LONGEST CONTINUOUS DAY</span><b id="longestDay">—</b></div>
+            <div><span>LONGEST CONTINUOUS NIGHT</span><b id="longestNight">—</b></div>
+            <div><span>AVERAGE SUN ALTITUDE</span><b id="avgAlt">—</b></div>
+            <div><span>MINIMUM SUN ALTITUDE</span><b id="minAlt">—</b></div>
+            <div><span>MAXIMUM SUN ALTITUDE</span><b id="maxAlt">—</b></div>
+            <div><span>ROTATION MODEL</span><b id="rotationModel">—</b></div>
+          </div>
+          <div id="message" class="message">Enter planetary data and run the analysis.</div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">DAYLIGHT HEATMAP</div>
+          <canvas id="heatmap" width="900" height="420"></canvas>
+          <div class="legend">
+            <span><i class="night"></i> low daylight</span>
+            <span><i class="twilight"></i> moderate</span>
+            <span><i class="day"></i> high daylight</span>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">MODEL NOTES</div>
+          <p>
+            The optimizer numerically samples a complete orbit and evaluates solar elevation
+            for fixed surface coordinates. It supports ordinary rotation and synchronous
+            rotation without requiring a separate planet type switch.
+          </p>
+          <p class="muted">
+            The result is intended as a practical in-game coordinate finder. Game-specific
+            orbital conventions may differ from a physical astronomy model, so treat the
+            output as an approximation unless the game's coordinate/epoch conventions are known.
+          </p>
+        </div>
+      </section>
+    </section>
+
+    <footer>
+      Planetary Daylight Optimizer · Static web app · No server required
+    </footer>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
