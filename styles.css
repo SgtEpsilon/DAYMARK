@@ -8,8 +8,8 @@
 body{margin:0;background:radial-gradient(circle at 70% 20%,#122026 0,#070a0c 42%,#050708 100%);color:var(--text);font-family:'Barlow Condensed',Arial,sans-serif;min-height:100vh}
 .app{max-width:1400px;margin:auto;padding:24px}
 .topbar{display:flex;justify-content:space-between;align-items:end;border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:18px}
-.eyebrow{font-size:12px;letter-spacing:2px;color:var(--muted)}
 h1{margin:2px 0 0;font-size:36px;letter-spacing:2px;font-weight:600}
+.subtitle{margin-top:4px;font-size:12px;letter-spacing:.5px;color:var(--muted)}
 .status{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--muted)}
 .layout{display:grid;grid-template-columns:320px 1fr;gap:18px}
 .panel{background:linear-gradient(145deg,rgba(18,25,29,.95),rgba(8,12,14,.96));border:1px solid var(--line);box-shadow:0 14px 40px #0005;padding:18px}
