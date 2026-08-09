@@ -22,6 +22,9 @@ input:focus,select:focus{border-color:#71878e}
 button{width:100%;padding:12px;margin-top:12px;border:1px solid #53666d;background:#151e22;color:#dce5e7;font:600 13px 'Barlow Condensed';letter-spacing:1.2px;cursor:pointer}
 button:hover{filter:brightness(1.2)}
 button.primary{background:#b8c7ca;color:#071014;border-color:#d8e2e4}
+button:disabled{opacity:.45;cursor:not-allowed;filter:none}
+.progress-wrap{margin-top:10px;height:6px;background:#0b1215;border:1px solid #1f2b30;overflow:hidden}
+.progress-bar{height:100%;width:0%;background:#a8c4c9;transition:width .15s ease-out}
 .content{display:grid;gap:18px}
 .coords{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 .coords>div,.metrics>div{background:#080d0f;border:1px solid #1f2b30;padding:13px}
