@@ -22,38 +22,44 @@
         <div class="panel-title">PLANET PARAMETERS</div>
 
         <label>Orbital period <span>days</span>
-          <input id="orbitalPeriod" type="text" inputmode="decimal" autocomplete="off" value="16.9">
+          <input id="orbitalPeriod" type="text" inputmode="decimal" autocomplete="off" value="16.9"
+            title="How long the planet takes to complete one full orbit, in days.">
         </label>
         <label>Rotational period <span>days</span>
-          <input id="rotationPeriod" type="text" inputmode="decimal" autocomplete="off" value="16.9">
+          <input id="rotationPeriod" type="text" inputmode="decimal" autocomplete="off" value="16.9"
+            title="How long the planet takes to complete one full spin on its axis, in days.">
         </label>
         <label>Axial tilt <span>degrees</span>
-          <input id="axialTilt" type="text" inputmode="decimal" autocomplete="off" value="124.74">
+          <input id="axialTilt" type="text" inputmode="decimal" autocomplete="off" value="124.74"
+            title="The planet's axial tilt in degrees. Values over 90° are accepted and treated literally.">
         </label>
         <label>Orbital eccentricity <span>0–0.99</span>
-          <input id="eccentricity" type="text" inputmode="decimal" autocomplete="off" value="0.0002">
+          <input id="eccentricity" type="text" inputmode="decimal" autocomplete="off" value="0.0002"
+            title="How elongated the orbit is, from 0 (circular) to 0.99 (highly elongated).">
         </label>
         <label>Argument of periapsis <span>degrees</span>
-          <input id="argPeriapsis" type="text" inputmode="decimal" autocomplete="off" value="191.20">
+          <input id="argPeriapsis" type="text" inputmode="decimal" autocomplete="off" value="191.20"
+            title="The orbital angle, in degrees, at which the planet is closest to its star.">
         </label>
+        <div id="fieldError" class="field-error" hidden></div>
 
         <div class="panel-title sub">OPTIMIZATION</div>
         <label>Latitude resolution <span>degrees</span>
-          <select id="latStep">
+          <select id="latStep" title="Smaller steps check more latitudes and take longer.">
             <option value="2">2° — faster</option>
             <option value="1" selected>1° — balanced</option>
             <option value="0.5">0.5° — detailed</option>
           </select>
         </label>
         <label>Longitude resolution <span>degrees</span>
-          <select id="lonStep">
+          <select id="lonStep" title="Smaller steps check more longitudes and take longer.">
             <option value="2">2° — faster</option>
             <option value="1" selected>1° — balanced</option>
             <option value="0.5">0.5° — detailed</option>
           </select>
         </label>
         <label>Orbit samples
-          <select id="samples">
+          <select id="samples" title="How many points along the orbit are sampled. More samples means a more accurate result.">
             <option value="720">720</option>
             <option value="1440" selected>1,440</option>
             <option value="2880">2,880</option>
@@ -61,6 +67,7 @@
         </label>
 
         <button id="calculate" class="primary">RUN FULL ORBIT ANALYSIS</button>
+        <button id="cancel" class="secondary" hidden>CANCEL</button>
         <button id="loadExample" class="secondary">LOAD EXAMPLE PLANET</button>
       </aside>
 
@@ -101,7 +108,9 @@
           <p>
             The optimizer numerically samples a complete orbit and evaluates solar elevation
             for fixed surface coordinates. It supports ordinary rotation and synchronous
-            rotation without requiring a separate planet type switch.
+            rotation without requiring a separate planet type switch. The full search and
+            the heatmap render run in a background worker, so the page stays responsive
+            while an analysis is in progress.
           </p>
           <p class="muted">
             The result is intended as a practical in-game coordinate finder. Game-specific

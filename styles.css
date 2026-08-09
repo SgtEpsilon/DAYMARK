@@ -19,6 +19,8 @@ h1{margin:2px 0 0;font-size:36px;letter-spacing:2px;font-weight:600}
 .controls label span{float:right;color:#647178;font-size:11px}
 input,select{display:block;width:100%;margin-top:6px;background:#070b0d;color:var(--text);border:1px solid #344149;padding:9px 10px;font:14px 'Share Tech Mono',monospace;outline:none}
 input:focus,select:focus{border-color:#71878e}
+input.invalid{border-color:#c96a5a;background:#170c0b}
+.field-error{margin-top:10px;padding:9px 10px;border-left:3px solid #c96a5a;background:#170c0b;color:#e0b3a9;font-size:12px}
 button{width:100%;padding:12px;margin-top:12px;border:1px solid #53666d;background:#151e22;color:#dce5e7;font:600 13px 'Barlow Condensed';letter-spacing:1.2px;cursor:pointer}
 button:hover{filter:brightness(1.2)}
 button.primary{background:#b8c7ca;color:#071014;border-color:#d8e2e4}
