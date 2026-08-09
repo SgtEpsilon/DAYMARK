@@ -4,16 +4,26 @@ const deg = r => r * 180 / Math.PI;
 const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
 
 function readInputs(){
-  return {
+  const p = {
     P: +$('orbitalPeriod').value,
     R: +$('rotationPeriod').value,
     tilt: +$('axialTilt').value,
-    e: clamp(+$('eccentricity').value,0,0.99),
+    e: +$('eccentricity').value,
     arg: +$('argPeriapsis').value,
     latStep:+$('latStep').value,
     lonStep:+$('lonStep').value,
     N:+$('samples').value
   };
+  p.e = clamp(p.e,0,0.99);
+  return p;
+}
+
+function inputsValid(p){
+  return Number.isFinite(p.P) && p.P>0 &&
+         Number.isFinite(p.R) && p.R>0 &&
+         Number.isFinite(p.tilt) &&
+         Number.isFinite(p.e) &&
+         Number.isFinite(p.arg);
 }
 
 /*
@@ -30,19 +40,29 @@ function solveKepler(M,e){
   return E;
 }
 
-function orbitState(t,p){
-  const M=2*Math.PI*t/p.P;
-  const E=solveKepler(M,p.e);
-  const nu=2*Math.atan2(Math.sqrt(1+p.e)*Math.sin(E/2),Math.sqrt(1-p.e)*Math.cos(E/2));
+// The orbital/solar state at time t depends only on the planet parameters,
+// never on the surface lat/lon being tested. Previously it was recomputed
+// from scratch (including a 12-iteration Kepler solve) for every single
+// lat/lon/sample combination, which is what made the analysis feel slow
+// and janky. Building the full set of per-sample states once up front and
+// reusing it for every surface point removes that redundant work entirely
+// — the numbers produced are identical, it just gets there far faster.
+function buildStates(p,N){
+  const dt=p.P/N;
   const arg=rad(p.arg);
-  // Simplified solar declination. Axial tilt is interpreted literally; equivalent obliquity is <=180.
-  const delta=Math.asin(Math.sin(rad(p.tilt))*Math.sin(nu+arg));
-
-  // Spin phase relative to the orbital reference. A 1:1 rotation produces a fixed
-  // subsolar longitude in this frame; retrograde values naturally reverse the phase.
-  const spin=2*Math.PI*t/p.R;
-  const subsolarLon=deg(spin - (nu+arg));
-  return {delta,subsolarLon};
+  const tiltSin=Math.sin(rad(p.tilt));
+  const states=new Array(N);
+  for(let i=0;i<N;i++){
+    const t=i*dt;
+    const M=2*Math.PI*t/p.P;
+    const E=solveKepler(M,p.e);
+    const nu=2*Math.atan2(Math.sqrt(1+p.e)*Math.sin(E/2),Math.sqrt(1-p.e)*Math.cos(E/2));
+    const delta=Math.asin(tiltSin*Math.sin(nu+arg));
+    const spin=2*Math.PI*t/p.R;
+    const subsolarLon=deg(spin-(nu+arg));
+    states[i]={delta,subsolarLon};
+  }
+  return {states,dt};
 }
 
 function solarElevation(lat,lon,state){
@@ -51,16 +71,14 @@ function solarElevation(lat,lon,state){
   return Math.asin(clamp(Math.sin(phi)*Math.sin(d)+Math.cos(phi)*Math.cos(d)*Math.cos(H),-1,1));
 }
 
-function evaluate(lat,lon,p){
+function evaluate(lat,lon,states,dt){
   let lit=0, sum=0, min=90, max=-90;
   let longestDay=0,longestNight=0,run=0,prevLit=null;
-  const dt=p.P/p.N;
-  for(let i=0;i<p.N;i++){
-    const s=orbitState(i*dt,p);
-    const alt=deg(solarElevation(lat,lon,s));
+  for(let i=0;i<states.length;i++){
+    const alt=deg(solarElevation(lat,lon,states[i]));
     const isLit=alt>=-0.833; // approximate visible sunrise/set including refraction
     if(isLit) lit++;
-    sum+=alt; min=Math.min(min,alt); max=Math.max(max,alt);
+    sum+=alt; if(alt<min)min=alt; if(alt>max)max=alt;
 
     if(prevLit===null){run=dt;prevLit=isLit}
     else if(isLit===prevLit){run+=dt}
@@ -74,25 +92,25 @@ function evaluate(lat,lon,p){
   else longestNight=Math.max(longestNight,run);
 
   // Score favours daylight first, then high average Sun.
-  const daylight=lit/p.N;
-  const score=daylight*0.60 + ((sum/p.N+90)/180)*0.30 + ((min+90)/180)*0.10;
-  return {lat,lon,daylight,sumAlt:sum/p.N,minAlt:min,maxAlt:max,longestDay,longestNight,score};
+  const daylight=lit/states.length;
+  const score=daylight*0.60 + ((sum/states.length+90)/180)*0.30 + ((min+90)/180)*0.10;
+  return {lat,lon,daylight,sumAlt:sum/states.length,minAlt:min,maxAlt:max,longestDay,longestNight,score};
 }
 
-function drawHeatmap(p,best){
+async function drawHeatmap(p,best,onProgress){
   const c=$('heatmap'),ctx=c.getContext('2d'),w=c.width,h=c.height;
   const image=ctx.createImageData(w,h);
   // A fast visual map: sample each pixel as a lat/lon average daylight estimate.
   // This is separate from the higher-resolution optimizer.
   const quickN=Math.min(240,p.N);
+  const {states:quickStates}=buildStates(p,quickN);
   for(let y=0;y<h;y++){
     const lat=90-y/(h-1)*180;
     for(let x=0;x<w;x++){
       const lon=x/(w-1)*360-180;
       let lit=0;
       for(let i=0;i<quickN;i++){
-        const s=orbitState(i*p.P/quickN,p);
-        if(deg(solarElevation(lat,lon,s))>=-0.833) lit++;
+        if(deg(solarElevation(lat,lon,quickStates[i]))>=-0.833) lit++;
       }
       const q=lit/quickN;
       const idx=(y*w+x)*4;
@@ -102,6 +120,10 @@ function drawHeatmap(p,best){
       image.data[idx+1]=Math.round(v);
       image.data[idx+2]=Math.round(v*.94);
       image.data[idx+3]=255;
+    }
+    if(y%50===0){
+      if(onProgress) onProgress(y/h);
+      await new Promise(requestAnimationFrame);
     }
   }
   ctx.putImageData(image,0,0);
@@ -119,20 +141,39 @@ function drawHeatmap(p,best){
   ctx.strokeStyle='#fff';ctx.beginPath();ctx.arc(bx,by,10,0,Math.PI*2);ctx.stroke();
 }
 
+function setBusy(busy){
+  $('calculate').disabled=busy;
+  $('loadExample').disabled=busy;
+  $('progressWrap').hidden=!busy;
+  if(!busy) $('progressBar').style.width='0%';
+}
+
 async function calculate(){
   const p=readInputs();
-  if(!(p.P>0&&p.R>0)){ $('message').textContent='Orbital and rotational periods must be greater than zero.'; return; }
+  if(!inputsValid(p)){
+    $('message').textContent='Enter valid numbers for all planet parameters (orbital and rotational periods must be greater than zero).';
+    return;
+  }
+  setBusy(true);
+  $('progressBar').style.width='0%';
   $('message').textContent='Running full-orbit numerical search…';
   await new Promise(requestAnimationFrame);
 
-  let best=null, count=0;
+  const {states,dt}=buildStates(p,p.N);
+  const totalRows=Math.floor(180/p.latStep)+1;
+
+  let best=null, count=0, rowIndex=0;
   for(let lat=-90;lat<=90.0001;lat+=p.latStep){
     for(let lon=-180;lon<180;lon+=p.lonStep){
-      const r=evaluate(lat,lon,p);
+      const r=evaluate(lat,lon,states,dt);
       if(!best||r.score>best.score)best=r;
       count++;
     }
-    if(lat%10===0) await new Promise(requestAnimationFrame);
+    rowIndex++;
+    if(rowIndex%4===0){
+      $('progressBar').style.width=Math.min(70,Math.round((rowIndex/totalRows)*70))+'%';
+      await new Promise(requestAnimationFrame);
+    }
   }
 
   $('bestLat').textContent=best.lat.toFixed(2)+'°';
@@ -151,8 +192,15 @@ async function calculate(){
   else if(Math.abs(ratio-2)<0.005) model='1:2 SPIN-ORBIT';
   $('rotationModel').textContent=model;
 
+  $('progressBar').style.width='80%';
+  $('message').textContent='Rendering daylight heatmap…';
+  await drawHeatmap(p,best,frac=>{
+    $('progressBar').style.width=(80+frac*20)+'%';
+  });
+
+  $('progressBar').style.width='100%';
   $('message').textContent=`Analysis complete: ${count.toLocaleString()} surface points × ${p.N.toLocaleString()} orbital samples.`;
-  drawHeatmap(p,best);
+  setBusy(false);
 }
 
 $('calculate').addEventListener('click',calculate);
@@ -163,6 +211,13 @@ $('loadExample').addEventListener('click',()=>{
   $('eccentricity').value=0.0002;
   $('argPeriapsis').value=191.20;
   calculate();
+});
+
+document.querySelectorAll('.controls input').forEach(input=>{
+  input.addEventListener('keydown',e=>{
+    if(e.key==='Enter'){ e.preventDefault(); calculate(); }
+  });
+  input.addEventListener('focus',()=>input.select());
 });
 
 calculate();
