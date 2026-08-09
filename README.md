@@ -2,7 +2,7 @@
 
 ### Daylight Analysis & Year-round Mapping of Astronomical Rotational Kinematics
 
-[![GitHub Pages Deployment](https://github.com/SgtEpsilon/DAYMARK/actions/workflows/pages/pages-build-deployment/badge.svg)](https://github.com/SgtEpsilon/DAYMARK/actions/workflows/pages/pages-build-deployment)
+[![DAYMARK Pages Deployment](https://github.com/SgtEpsilon/DAYMARK/actions/workflows/pages.yml/badge.svg)](https://github.com/SgtEpsilon/DAYMARK/actions/workflows/pages.yml)
 
 **DAYMARK** is a browser-based planetary daylight analysis and navigation tool designed to determine the best latitude and longitude locations for daylight on planetary bodies.
 
@@ -13,6 +13,29 @@ The application analyses a planet's rotation, orbit, axial tilt and eccentricity
 ## 🌐 Live Website
 
 **[Open DAYMARK](https://sgtepsilon.github.io/DAYMARK/)**
+
+---
+
+## 🚀 GitHub Pages
+
+DAYMARK is a static client-side website and does not require a backend or database.
+
+The site is automatically deployed to GitHub Pages whenever changes are pushed to the `main` branch.
+
+```text
+main
+  │
+  ▼
+GitHub Actions
+  │
+  ├── Checkout
+  ├── Configure GitHub Pages
+  ├── Upload site artifact
+  └── Deploy Pages
+  │
+  ▼
+DAYMARK
+```
 
 ---
 
