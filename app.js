@@ -2,6 +2,23 @@ const $ = id => document.getElementById(id);
 
 const paramInputs = ['orbitalPeriod','rotationPeriod','axialTilt','eccentricity','argPeriapsis'];
 
+const PALETTE_LABELS = {
+  default:'Default', icy:'Icy body', rockyIce:'Rocky ice body', rocky:'Rocky body',
+  highMetal:'High metal content world', metalRich:'Metal-rich body', earthlike:'Earth-like world',
+  waterWorld:'Water world', waterGiant:'Water giant', ammonia:'Ammonia world', gasGiant:'Gas giant'
+};
+
+let currentPaletteKey = 'default';
+let currentHasAtmosphere = false;
+
+function setPalette(key,hasAtmosphere,sourceLabel){
+  currentPaletteKey = PALETTE_LABELS[key] ? key : 'default';
+  currentHasAtmosphere = !!hasAtmosphere;
+  $('planetType').value = currentPaletteKey;
+  const suffix = currentHasAtmosphere ? ' + atmosphere haze' : '';
+  $('paletteCaption').textContent = `Palette: ${PALETTE_LABELS[currentPaletteKey]}${suffix}${sourceLabel ? ' ('+sourceLabel+')' : ''}`;
+}
+
 function readInputs(){
   const p = {
     P: +$('orbitalPeriod').value,
@@ -11,7 +28,9 @@ function readInputs(){
     arg: +$('argPeriapsis').value,
     latStep: +$('latStep').value,
     lonStep: +$('lonStep').value,
-    N: +$('samples').value
+    N: +$('samples').value,
+    paletteKey: currentPaletteKey,
+    hasAtmosphere: currentHasAtmosphere
   };
   p.e = Math.max(0, Math.min(0.99, p.e));
   return p;
@@ -90,6 +109,114 @@ function showResult(best,count,samples,model){
   $('message').textContent = `Full-orbit search complete: ${count.toLocaleString()} surface points × ${samples.toLocaleString()} orbital samples. Rendering heatmap…`;
 }
 
+// Maps an EDSM body subType string to one of this app's palette keys.
+// Checked in order — more specific matches (e.g. "water giant") must be
+// tested before their broader relatives (e.g. "water world").
+function classifyBody(subType){
+  const s = (subType||'').toLowerCase();
+  if(s.includes('water giant')) return 'waterGiant';
+  if(s.includes('water world')) return 'waterWorld';
+  if(s.includes('ammonia')) return 'ammonia';
+  if(s.includes('earth')) return 'earthlike';
+  if(s.includes('metal-rich') || s.includes('metal rich')) return 'metalRich';
+  if(s.includes('high metal content')) return 'highMetal';
+  if(s.includes('rocky ice')) return 'rockyIce';
+  if(s.includes('icy')) return 'icy';
+  if(s.includes('rocky')) return 'rocky';
+  if(s.includes('gas giant') || s.includes('giant with')) return 'gasGiant';
+  return 'default';
+}
+
+function hasAtmosphere(body){
+  const a = body.atmosphereType;
+  return !!a && a.toLowerCase() !== 'no atmosphere';
+}
+
+// Fills the five orbital fields from an EDSM body record. EDSM sometimes
+// returns null for eccentricity/tilt on bodies with incomplete scans —
+// those fall back to 0 rather than leaving the field invalid.
+//
+// EDSM's axialTilt field is a known special case: the underlying Elite
+// Dangerous journal stores axial tilt in radians (everything else EDSM
+// converts to normal in-game units, but this one field is passed through
+// unconverted). It has to be turned into degrees here, or a real 23.4°
+// tilt like Earth's shows up as "0.4°".
+function applyBodyData(body){
+  $('orbitalPeriod').value = Number.isFinite(body.orbitalPeriod) ? body.orbitalPeriod : $('orbitalPeriod').value;
+  $('rotationPeriod').value = Number.isFinite(body.rotationalPeriod) ? Math.abs(body.rotationalPeriod) : $('rotationPeriod').value;
+  $('axialTilt').value = Number.isFinite(body.axialTilt) ? (body.axialTilt * 180 / Math.PI) : 0;
+  $('eccentricity').value = Number.isFinite(body.orbitalEccentricity) ? body.orbitalEccentricity : 0;
+  $('argPeriapsis').value = Number.isFinite(body.argOfPeriapsis) ? body.argOfPeriapsis : 0;
+  paramInputs.forEach(id => $(id).classList.remove('invalid'));
+
+  const key = classifyBody(body.subType);
+  setPalette(key, hasAtmosphere(body), body.name);
+
+  const missing = [];
+  if(!Number.isFinite(body.orbitalEccentricity)) missing.push('eccentricity');
+  if(!Number.isFinite(body.axialTilt)) missing.push('axial tilt');
+  const missingNote = missing.length ? ` (EDSM had no ${missing.join(' or ')} data — set to 0)` : '';
+  $('edsmStatus').textContent = `Loaded ${body.name} — ${body.subType||'unknown type'}${missingNote}.`;
+}
+
+async function edsmFetchBodies(){
+  const system = $('edsmSystem').value.trim();
+  if(!system){
+    $('edsmStatus').textContent = 'Enter a system name first.';
+    return;
+  }
+  $('edsmPickWrap').hidden = true;
+  $('edsmStatus').textContent = 'Contacting EDSM…';
+  $('edsmFetch').disabled = true;
+  try{
+    const res = await fetch('https://www.edsm.net/api-system-v1/bodies?systemName='+encodeURIComponent(system));
+    if(!res.ok) throw new Error('EDSM request failed ('+res.status+')');
+    const data = await res.json();
+    const bodies = (data && data.bodies) ? data.bodies.filter(b => b.type === 'Planet') : [];
+    if(!bodies.length){
+      $('edsmStatus').textContent = data && data.name ? `No planets found in ${data.name} on EDSM.` : 'System not found on EDSM.';
+      return;
+    }
+
+    const designation = $('edsmBody').value.trim().toLowerCase();
+    let match = null;
+    if(designation){
+      match = bodies.find(b => b.name.toLowerCase() === (system+' '+designation).toLowerCase())
+           || bodies.find(b => b.name.toLowerCase().endsWith(designation));
+      if(!match){
+        $('edsmStatus').textContent = `No planet matching "${$('edsmBody').value.trim()}" in ${data.name}. Showing all planets found instead.`;
+      }
+    }
+
+    if(match){
+      applyBodyData(match);
+      return;
+    }
+
+    if(bodies.length === 1){
+      applyBodyData(bodies[0]);
+      return;
+    }
+
+    // Ambiguous — let the user pick from what EDSM actually has.
+    const sel = $('edsmPick');
+    sel.innerHTML = '';
+    bodies.forEach(b => {
+      const opt = document.createElement('option');
+      opt.value = b.name;
+      opt.textContent = `${b.name} — ${b.subType||'unknown type'}`;
+      sel.appendChild(opt);
+    });
+    $('edsmPickWrap').hidden = false;
+    $('edsmPick').dataset.bodies = JSON.stringify(bodies);
+    if(!designation) $('edsmStatus').textContent = `${bodies.length} planets found in ${data.name} — pick one below.`;
+  }catch(err){
+    $('edsmStatus').textContent = 'Could not reach EDSM (' + err.message + '). You can still set the planet type manually below.';
+  }finally{
+    $('edsmFetch').disabled = false;
+  }
+}
+
 function calculate(){
   const p = readInputs();
   const problems = validateInputs(p);
@@ -133,7 +260,23 @@ $('loadExample').addEventListener('click', () => {
   $('axialTilt').value = 124.74;
   $('eccentricity').value = 0.0002;
   $('argPeriapsis').value = 191.20;
+  setPalette('default', false, null);
   calculate();
+});
+
+$('edsmFetch').addEventListener('click', edsmFetchBodies);
+['edsmSystem','edsmBody'].forEach(id => {
+  $(id).addEventListener('keydown', e => {
+    if(e.key === 'Enter'){ e.preventDefault(); edsmFetchBodies(); }
+  });
+});
+$('edsmPick').addEventListener('change', () => {
+  const bodies = JSON.parse($('edsmPick').dataset.bodies || '[]');
+  const body = bodies.find(b => b.name === $('edsmPick').value);
+  if(body) applyBodyData(body);
+});
+$('planetType').addEventListener('change', () => {
+  setPalette($('planetType').value, false, 'manual');
 });
 
 paramInputs.forEach(id => {

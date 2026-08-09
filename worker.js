@@ -15,6 +15,34 @@ function rad(d){ return d*Math.PI/180; }
 function deg(r){ return r*180/Math.PI; }
 function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
 
+// Heatmap color palettes, keyed by a simplified planet-type classification.
+// dark = color at 0% daylight, lit = color at 100% daylight; every pixel is
+// a linear blend between the two based on its lit fraction. "default"
+// reproduces the app's original teal-gray look exactly, so a run with no
+// planet-type data behaves exactly as before.
+const PALETTES = {
+  default:   { dark:[11,12,11],  lit:[200,217,204] },
+  icy:       { dark:[8,14,20],   lit:[214,238,247] },
+  rockyIce:  { dark:[10,14,16],  lit:[196,214,214] },
+  rocky:     { dark:[18,12,8],   lit:[196,158,120] },
+  highMetal: { dark:[14,12,10],  lit:[176,168,158] },
+  metalRich: { dark:[16,14,12],  lit:[214,196,150] },
+  earthlike: { dark:[6,14,18],   lit:[140,205,180] },
+  waterWorld:{ dark:[4,16,24],   lit:[110,196,224] },
+  waterGiant:{ dark:[6,18,28],   lit:[120,200,232] },
+  ammonia:   { dark:[16,12,4],   lit:[214,188,110] },
+  gasGiant:  { dark:[14,10,8],   lit:[224,176,120] }
+};
+
+function lerp(a,b,t){ return a+(b-a)*t; }
+
+// A thin atmosphere lightens/hazes both ends of the palette slightly.
+function hazePalette(pal,hasAtmosphere){
+  if(!hasAtmosphere) return pal;
+  const mix=(c)=>c.map(v=>Math.round(lerp(v,255,0.12)));
+  return { dark:mix(pal.dark), lit:mix(pal.lit) };
+}
+
 // Solve Kepler's equation E - e*sin(E) = M for E.
 //
 // The original app used a fixed 12-step plain Newton iteration. That works
@@ -107,25 +135,25 @@ function evaluateRow(lat,lonStep,lonCount,states,best){
   return best;
 }
 
-function heatmapRow(y,h,w,quickStates,best){
+function heatmapRow(y,h,w,quickStates,palette){
   const lat=90-y/(h-1)*180;
   const phi=rad(lat), sinPhi=Math.sin(phi), cosPhi=Math.cos(phi);
   const {delta,subsolarLon,N}=quickStates;
+  const {dark,lit}=palette;
   const row=new Uint8ClampedArray(w*4);
   for(let x=0;x<w;x++){
     const lon=x/(w-1)*360-180;
-    let lit=0;
+    let count=0;
     for(let i=0;i<N;i++){
       const H=rad(lon-subsolarLon[i]);
       const s=Math.asin(clamp(sinPhi*Math.sin(delta[i])+cosPhi*Math.cos(delta[i])*Math.cos(H),-1,1));
-      if(deg(s)>=-0.833) lit++;
+      if(deg(s)>=-0.833) count++;
     }
-    const q=lit/N;
+    const q=count/N;
     const idx=x*4;
-    const v=Math.round(12+q*205);
-    row[idx]=Math.round(v*.92);
-    row[idx+1]=Math.round(v);
-    row[idx+2]=Math.round(v*.94);
+    row[idx]  =Math.round(lerp(dark[0],lit[0],q));
+    row[idx+1]=Math.round(lerp(dark[1],lit[1],q));
+    row[idx+2]=Math.round(lerp(dark[2],lit[2],q));
     row[idx+3]=255;
   }
   return row;
@@ -168,10 +196,12 @@ self.onmessage=function(e){
   const w=900,h=420;
   const quickN=Math.min(240,p.N);
   const quickStates=buildStates(p,quickN);
+  const basePalette=PALETTES[p.paletteKey]||PALETTES.default;
+  const palette=hazePalette(basePalette,!!p.hasAtmosphere);
   const pixels=new Uint8ClampedArray(w*h*4);
   for(let y=0;y<h;y++){
     if(runId!==currentRunId) return;
-    const row=heatmapRow(y,h,w,quickStates,best);
+    const row=heatmapRow(y,h,w,quickStates,palette);
     pixels.set(row,y*w*4);
     if(y%40===0) self.postMessage({type:'progress',runId,pct:65+Math.round((y/h)*35)});
   }

@@ -36,8 +36,10 @@ button:disabled{opacity:.45;cursor:not-allowed;filter:none}
 .metrics span{display:block;color:var(--muted);font-size:10px;letter-spacing:1px}
 .metrics b{display:block;margin-top:4px;font:15px 'Share Tech Mono',monospace}
 .message{margin-top:12px;padding:10px;border-left:3px solid #687980;background:#0b1215;color:#aab7bb;font-size:13px}
+.message.small{margin-top:8px;padding:8px 9px;font-size:11px;line-height:1.4}
 canvas{width:100%;height:auto;display:block;background:#050809;border:1px solid #1c272b}
 .legend{display:flex;gap:18px;margin-top:9px;color:var(--muted);font-size:12px}
+.legend.small{margin-top:6px;font-size:11px;gap:0}
 .legend i{display:inline-block;width:10px;height:10px;margin-right:5px;border:1px solid #46545a}
 .legend .night{background:#10191d}.legend .twilight{background:#687779}.legend .day{background:#d2dfb6}
 p{color:#a9b5b9;line-height:1.5;margin:8px 0;font-size:14px}.muted{color:#68757b;font-size:12px}
