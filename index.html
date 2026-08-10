@@ -136,6 +136,56 @@
           <div class="legend small muted" id="paletteCaption">Palette: Default</div>
         </div>
 
+        <div class="panel controls">
+          <div class="panel-title">TIME WINDOW</div>
+          <div id="edClock" class="message small">—</div>
+          <label class="checkline">
+            <input id="restrictWindow" type="checkbox" title="When on, the optimizer and heatmap only sample the window below instead of the full orbit.">
+            Restrict analysis to this window
+          </label>
+          <label>Start
+            <select id="windowAnchor" title="'Now' treats the current moment as t = 0 in the model — the game exposes no absolute orbital epoch, so this is the best available reference point.">
+              <option value="now" selected>Now</option>
+              <option value="custom">Custom offset</option>
+            </select>
+          </label>
+          <label id="windowStartWrap" hidden>Offset from now <span>days</span>
+            <input id="windowStartOffset" type="text" inputmode="decimal" autocomplete="off" value="0"
+              title="How far into the orbit the window starts, in days from t = 0.">
+          </label>
+          <label>Duration <span>hours</span>
+            <input id="windowDurationHours" type="text" inputmode="decimal" autocomplete="off" value="24"
+              title="Length of the window to check, in hours.">
+          </label>
+
+          <div class="panel-title sub">HEATMAP TIMEBAR</div>
+          <div id="timebarReadout" class="message small">—</div>
+          <input id="timebar" type="range" min="-1826" max="1826" step="1" value="0"
+            title="Scrub the heatmap to any moment within 5 years before or after now, using the Duration set above. Independent of the checkbox above — that only affects the optimizer used by Run Full Orbit Analysis.">
+          <div class="timebar-scale">
+            <span>-5y</span><span>-2.5y</span><span>now</span><span>+2.5y</span><span>+5y</span>
+          </div>
+          <button id="timebarReset" class="secondary">JUMP TO NOW</button>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">LOCATION TIMELINE</div>
+          <p class="muted">Check whether a specific coordinate is in day or night across the time window set above.</p>
+          <div class="coords timeline-inputs">
+            <label>Latitude <span>°</span>
+              <input id="tlLat" type="text" inputmode="decimal" autocomplete="off" value="0">
+            </label>
+            <label>Longitude <span>°</span>
+              <input id="tlLon" type="text" inputmode="decimal" autocomplete="off" value="0">
+            </label>
+          </div>
+          <button id="tlUseBest" class="secondary">USE OPTIMAL COORDINATES</button>
+          <button id="tlCheck" class="primary">CHECK TIMELINE</button>
+          <canvas id="timelineCanvas" width="900" height="70"></canvas>
+          <div id="timelineInfo" class="message small">Set a window and coordinates, then check the timeline.</div>
+          <div id="timelineList" class="timeline-list"></div>
+        </div>
+
         <div class="panel">
           <div class="panel-title">MODEL NOTES</div>
           <p>
@@ -149,6 +199,12 @@
             The result is intended as a practical in-game coordinate finder. Game-specific
             orbital conventions may differ from a physical astronomy model, so treat the
             output as an approximation unless the game's coordinate/epoch conventions are known.
+          </p>
+          <p class="muted">
+            The game exposes no absolute orbital epoch, so the Time Window and Location
+            Timeline panels treat "now" as t&nbsp;=&nbsp;0 in the model rather than tying it to
+            a real in-game date. Elapsed time within a window is accurate; its alignment to
+            the planet's true real-time phase is not known.
           </p>
         </div>
       </section>
