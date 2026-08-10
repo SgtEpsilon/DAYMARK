@@ -16,29 +16,6 @@ The application analyses a planet's rotation, orbit, axial tilt and eccentricity
 
 ---
 
-## 🚀 GitHub Pages
-
-DAYMARK is a static client-side website and does not require a backend or database.
-
-The site is automatically deployed to GitHub Pages whenever changes are pushed to the `main` branch.
-
-```text
-main
-  │
-  ▼
-GitHub Actions
-  │
-  ├── Checkout
-  ├── Configure GitHub Pages
-  ├── Upload site artifact
-  └── Deploy Pages
-  │
-  ▼
-DAYMARK
-```
-
----
-
 ## ✦ Features
 
 ### Planetary Analysis

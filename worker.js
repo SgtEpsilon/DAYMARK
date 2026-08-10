@@ -79,14 +79,27 @@ function solveKepler(M,e){
 // lat/lon/sample combination — tens of millions of redundant solves per
 // run. Building the full set of per-sample states once and reusing them
 // for every surface point removes that waste entirely.
-function buildStates(p,N){
-  const dt=p.P/N;
+//
+// startDays/spanDays let the sampled window be something other than the
+// full orbit (0..P) — e.g. a 24h slice starting "now". t is always an
+// absolute time-since-t=0 in days; the orbital/spin phase (M and spin)
+// are computed from t directly, so a window that starts partway through
+// the orbit still lands on the correct phase rather than restarting at
+// periapsis.
+function buildStates(p,N,startDays,spanDays){
+  const start = startDays||0;
+  const span = (spanDays===undefined||spanDays===null) ? p.P : spanDays;
+  const dt=span/N;
   const arg=rad(p.arg);
   const tiltSin=Math.sin(rad(p.tilt));
   const delta=new Float64Array(N);
   const subsolarLon=new Float64Array(N);
   for(let i=0;i<N;i++){
-    const t=i*dt;
+    const t=start+i*dt;
+    // M is left unwrapped (not reduced mod 2π) — solveKepler's bracket
+    // [M-e,M+e] is valid for any real M since the equation is periodic,
+    // and keeping t absolute means a window starting mid-orbit still
+    // lands on the correct phase instead of restarting at periapsis.
     const M=2*Math.PI*t/p.P;
     const E=solveKepler(M,p.e);
     const nu=2*Math.atan2(Math.sqrt(1+p.e)*Math.sin(E/2),Math.sqrt(1-p.e)*Math.cos(E/2));
@@ -94,7 +107,7 @@ function buildStates(p,N){
     const spin=2*Math.PI*t/p.R;
     subsolarLon[i]=deg(spin-(nu+arg));
   }
-  return {delta,subsolarLon,dt,N};
+  return {delta,subsolarLon,dt,N,start};
 }
 
 // Evaluate every longitude at one latitude. sin(lat)/cos(lat) depend only
@@ -159,17 +172,100 @@ function heatmapRow(y,h,w,quickStates,palette){
   return row;
 }
 
+// Given per-sample lit states at one fixed lat/lon, find the longest
+// continuous day and night runs within the window. Shared by the
+// optimizer's row evaluation (evaluateRow, above) and the timeline check.
+function trackRuns(dt,N,isLitAt){
+  let longestDay=0,longestNight=0,run=0,prevLit=null,lit=0;
+  for(let i=0;i<N;i++){
+    const isLit=isLitAt(i);
+    if(isLit) lit++;
+    if(prevLit===null){ run=dt; prevLit=isLit; }
+    else if(isLit===prevLit){ run+=dt; }
+    else{
+      if(prevLit) longestDay=Math.max(longestDay,run); else longestNight=Math.max(longestNight,run);
+      run=dt; prevLit=isLit;
+    }
+  }
+  if(prevLit) longestDay=Math.max(longestDay,run); else longestNight=Math.max(longestNight,run);
+  return {longestDay,longestNight,daylight:lit/N};
+}
+
 let currentRunId=0;
 
 self.onmessage=function(e){
   const msg=e.data;
   if(msg.type==='cancel'){ currentRunId++; return; } // invalidates any in-flight run
+
+  if(msg.type==='timeline'){
+    // Single lat/lon, sampled only across the requested window — used by
+    // the "Location timeline" panel rather than the full-grid optimizer.
+    const runId=++currentRunId;
+    const p=msg.params;
+    const N=msg.N||400;
+    const states=buildStates(p,N,msg.startDays,msg.spanDays);
+    const {delta,subsolarLon,dt,start}=states;
+    const phi=rad(msg.lat), sinPhi=Math.sin(phi), cosPhi=Math.cos(phi);
+    const samples=new Array(N);
+    for(let i=0;i<N;i++){
+      const H=rad(msg.lon-subsolarLon[i]);
+      const s=Math.asin(clamp(sinPhi*Math.sin(delta[i])+cosPhi*Math.cos(delta[i])*Math.cos(H),-1,1));
+      const alt=deg(s);
+      samples[i]={t:start+i*dt,alt,isLit:alt>=-0.833};
+    }
+    if(runId!==currentRunId) return;
+    const stats=trackRuns(dt,N,i=>samples[i].isLit);
+    self.postMessage({type:'timelineResult',runId,samples,lat:msg.lat,lon:msg.lon,
+      startDays:msg.startDays,spanDays:msg.spanDays,anchorNow:msg.anchorNow,edStart:msg.edStart,
+      ...stats});
+    return;
+  }
+
+  if(msg.type==='heatmapOnly'){
+    // Lightweight heatmap-only pass used by the timebar slider: no grid
+    // search over lat/lon for a new "best" point, just the visual daylight
+    // render for the requested window. This is what makes the slider feel
+    // live — the full optimizer (below) is far too expensive to re-run on
+    // every drag tick, but this alone is cheap enough to run continuously.
+    //
+    // Reuses the same runId scheme as the full run: a new message (another
+    // drag tick, or a full run starting) bumps currentRunId, and any
+    // in-flight heatmapOnly pass notices at the next row and bails out
+    // instead of wasting time finishing a stale frame.
+    const runId=++currentRunId;
+    const p=msg.params;
+    const startDays=msg.startDays||0;
+    const spanDays=(msg.spanDays===undefined||msg.spanDays===null) ? p.P : Math.max(msg.spanDays,1/1440);
+    const w=msg.w||900, h=msg.h||420;
+    const quickN=Math.max(2,Math.min(msg.quickN||240, p.N||240));
+
+    const quickStates=buildStates(p,quickN,startDays,spanDays);
+    const basePalette=PALETTES[p.paletteKey]||PALETTES.default;
+    const palette=hazePalette(basePalette,!!p.hasAtmosphere);
+    const pixels=new Uint8ClampedArray(w*h*4);
+    for(let y=0;y<h;y++){
+      if(runId!==currentRunId) return;
+      const row=heatmapRow(y,h,w,quickStates,palette);
+      pixels.set(row,y*w*4);
+    }
+    if(runId!==currentRunId) return;
+    self.postMessage({type:'heatmapOnlyResult',runId,w,h,pixels:pixels.buffer,startDays,spanDays},[pixels.buffer]);
+    return;
+  }
+
   if(msg.type!=='run') return;
 
   const runId=++currentRunId;
   const p=msg.params;
 
-  const states=buildStates(p,p.N);
+  // A restricted window scans [startOffsetDays, startOffsetDays+durationDays)
+  // instead of the full orbit [0,P). Everything downstream (grid search and
+  // heatmap) is identical either way — only the sampled span changes.
+  const useWindow=!!p.restrictWindow;
+  const startDays=useWindow ? (p.startOffsetDays||0) : 0;
+  const spanDays=useWindow ? Math.max(p.durationDays||(1/24),1/1440) : p.P;
+
+  const states=buildStates(p,p.N,startDays,spanDays);
   const latCount=Math.floor(180/p.latStep)+1;
   const lonCount=Math.round(360/p.lonStep);
 
@@ -190,12 +286,12 @@ self.onmessage=function(e){
   else if(Math.abs(ratio-0.5)<0.005) model='2:1 SPIN-ORBIT';
   else if(Math.abs(ratio-2)<0.005) model='1:2 SPIN-ORBIT';
 
-  self.postMessage({type:'gridResult',runId,best,count,samples:p.N,model});
+  self.postMessage({type:'gridResult',runId,best,count,samples:p.N,model,useWindow,startDays,spanDays});
 
   // Heatmap pass — separate, lower resolution than the optimizer.
   const w=900,h=420;
   const quickN=Math.min(240,p.N);
-  const quickStates=buildStates(p,quickN);
+  const quickStates=buildStates(p,quickN,startDays,spanDays);
   const basePalette=PALETTES[p.paletteKey]||PALETTES.default;
   const palette=hazePalette(basePalette,!!p.hasAtmosphere);
   const pixels=new Uint8ClampedArray(w*h*4);
